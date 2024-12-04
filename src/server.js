@@ -3,7 +3,7 @@ const { app } = require('./app');
 
 const { db } = require('./database/config');
 const { initModel } = require('./model/initModel');
-
+// comentario
 initModel();
 
 db.authenticate()
