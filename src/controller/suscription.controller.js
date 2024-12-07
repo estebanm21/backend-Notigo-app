@@ -2,6 +2,8 @@ const Subscription = require('../model/subscription.model');
 const Store = require('../model/store.model');
 const catchAsync = require('../helpers/catchAsync');
 const AppError = require('../helpers/AppError');
+const { getDownloadURL, ref } = require('firebase/storage');
+const { storage } = require('../helpers/firebase');
 
 // Función para suscribir al usuario a una tienda
 const subscribeToStore = catchAsync(async (req, res, next) => {
@@ -18,10 +20,7 @@ const subscribeToStore = catchAsync(async (req, res, next) => {
   }
 
   // Crear la nueva suscripción
-  const subscription = await Subscription.create({
-    userId,
-    storeId,
-  });
+  const subscription = await Subscription.create({ userId, storeId });
 
   return res.status(201).json({
     status: 'success',
@@ -30,19 +29,50 @@ const subscribeToStore = catchAsync(async (req, res, next) => {
   });
 });
 
-// Función para obtener las suscripciones del usuario
-const getSubscriptions = catchAsync(async (req, res, next) => {
+const findAllStoresWithSubscriptions = catchAsync(async (req, res, next) => {
   const userId = req.sessionUser.id;
 
-  // Obtener todas las tiendas a las que el usuario está suscrito
+  // Obtener las suscripciones del usuario
   const subscriptions = await Subscription.findAll({
-    where: { userId },
-    include: [{ model: Store, attributes: ['id', 'name', 'email', 'address'] }],
+    where: { userId }, // Filtrar por el ID del usuario
+  });
+
+  // Obtener los ids de las tiendas a las que está suscrito el usuario
+  const subscribedStoreIds = subscriptions.map((sub) => sub.storeId);
+
+  if (subscribedStoreIds.length === 0) {
+    return res.status(200).json({
+      status: 'success',
+      stores: [], // Si no está suscrito a ninguna tienda, devolver un array vacío
+    });
+  }
+
+  // Obtener las tiendas a las que está suscrito el usuario
+  const stores = await Store.findAll({
+    where: {
+      id: subscribedStoreIds, // Filtramos solo las tiendas a las que está suscrito
+      status: 'active', // Aseguramos que solo estamos buscando tiendas activas
+    },
+  });
+
+  const storesPromise = stores.map(async (store) => {
+    const imgRef = ref(storage, store.profileImgUrl);
+    const url = await getDownloadURL(imgRef);
+    store.profileImgUrl = url;
+    return store;
+  });
+
+  const storeResolved = await Promise.all(storesPromise);
+
+  // Añadir el campo isSubscribed (aunque siempre será true porque estamos filtrando solo las suscripciones)
+  const storesWithSubscription = storeResolved.map((store) => {
+    store.isSubscribed = true;
+    return store;
   });
 
   return res.status(200).json({
     status: 'success',
-    subscriptions,
+    stores: storesWithSubscription, // Aquí devolvemos solo las tiendas a las que está suscrito el usuario
   });
 });
 
@@ -74,6 +104,6 @@ const unsubscribeFromStore = catchAsync(async (req, res, next) => {
 
 module.exports = {
   subscribeToStore,
-  getSubscriptions,
+  findAllStoresWithSubscriptions,
   unsubscribeFromStore,
 };

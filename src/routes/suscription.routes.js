@@ -1,7 +1,7 @@
 const express = require('express');
 const {
   subscribeToStore,
-  getSubscriptions,
+  findAllStoresWithSubscriptions,
   unsubscribeFromStore,
 } = require('../controller/suscription.controller');
 const {
@@ -12,12 +12,12 @@ const {
 const router = express.Router();
 
 router.post('/subscribe', protect, protectAccountOwner, subscribeToStore);
-router.get('/mysubscriptions', protect, protectAccountOwner, getSubscriptions);
-router.delete(
-  '/unsubscribe',
+router.get(
+  '/mysubscriptions',
   protect,
   protectAccountOwner,
-  unsubscribeFromStore
+  findAllStoresWithSubscriptions
 );
+router.post('/unsubscribe', protect, protectAccountOwner, unsubscribeFromStore);
 
 module.exports = router;
